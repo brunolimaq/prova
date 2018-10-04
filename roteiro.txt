@@ -57,6 +57,18 @@ http:
  "insecure-registries" : ["myregistry.local:5000"]
  }
 
+$ mkdir -p certs
+
+$ openssl req \
+  -newkey rsa:4096 -nodes -sha256 -keyout certs/domain.key \
+  -x509 -days 365 -out certs/domain.crt
+  
+  Linux: Copy the domain.crt file to /etc/docker/certs.d/myregistrydomain.com:5000/ca.crt on every Docker host. You do not need to restart Docker.
+  
+  cp certs/domain.crt /etc/pki/ca-trust/source/anchors/myregistrydomain.com.crt
+update-ca-trust
+
+
  Cadastrar DNS - /etc/hosts
  Criar TAG - docker tag ubuntu:16.04 myregistry.local:5000/ubuntu:16.04
  Enviar Imagem para Registy -  docker push myregistry.local:5000/ubuntu:16.04
