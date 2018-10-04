@@ -1,0 +1,38 @@
+---
+- name: Install docker
+  gather_facts: No
+  hosts: prova
+
+  tasks:
+    - name: Docker Registry
+      yum:
+        name: docker-distribution
+        state: latest
+    - name: Copia arquivo de configuração
+      copy:
+        src: /etc/ansible/config.yml
+        dest: /etc/docker-distribution/registry/config.yml
+        owner: root
+        group: root
+        mode: 0644
+    - name: Configurar insecure registry
+      copy:
+        src: '/etc/ansible/daemon.json'
+        dest: '/etc/docker/daemon.json'
+        owner: root
+        group: root
+        mode: 0644
+    - name: Start Docker Registrry
+      service:
+        name: docker-distribution
+        state: started
+        enabled: yes
+      become: yes
+    - name: Restart service httpd, in all cases
+      service:
+        name: docker
+        state: restarted
+
+
+
+
