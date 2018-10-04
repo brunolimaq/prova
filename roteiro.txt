@@ -1,0 +1,252 @@
+Prova - 
+####Instal Docker via Ansible
+
+
+Remove Docker:
+
+yum remove docker \
+                  docker-client \
+                  docker-client-latest \
+                  docker-common \
+                  docker-latest \
+                  docker-latest-logrotate \
+                  docker-logrotate \
+                  docker-selinux \
+                  docker-engine-selinux \
+                  docker-engine
+
+
+
+ANTES - obsoletes=0 to /etc/yum.conf
+
+Install Ansible
+edita o hosts com os ip dos servidores(cria um grupo - PRova)
+
+yml de instalação:
+
+
+ansible-playbook installDocker.yml
+
+####Docker Registry
+
+
+yum -y install docker-distribution
+
+/etc/docker-distribution/registry/config.yml
+
+version: 0.1
+log:
+  fields:
+    service: registry
+storage:
+    cache:
+        layerinfo: inmemory
+    filesystem:
+        rootdirectory: /var/lib/registry
+http:
+    addr: :5000
+
+    systemctl start docker-distribution
+    systemctl enable docker-distribution
+
+    Add Insecure Registry to Docker Engine
+
+	/etc/docker/daemon.json
+
+ {
+ "insecure-registries" : ["myregistry.local:5000"]
+ }
+
+ Cadastrar DNS - /etc/hosts
+ Criar TAG - docker tag ubuntu:16.04 myregistry.local:5000/ubuntu:16.04
+ Enviar Imagem para Registy -  docker push myregistry.local:5000/ubuntu:16.04
+ Verificar imagem grava no Registry - ls /var/lib/registry/docker/registry/v2/repositories
+ Baixar imagem (localmente) - docker pull registry-hostname:500/image:TAG
+
+ Configurar Nginx
+ rpm -Uvh http://nginx.org/packages/centos/7/noarch/RPMS/nginx-release-centos-7-0.el7.ngx.noarch.rpm
+ yum install nginx
+systemctl enable nginx.service
+systemctl start nginx.service
+yum install nginx
+
+Configurar Vhost HTTP
+
+Configurar Vhost HTTPS
+
+Gerar Certificados
+
+
+export DOMAIN_NAME=nasrvranchhl01as.na.sebrae.corp
+export TCP_PORT=443
+openssl s_client -connect $DOMAIN_NAME:$TCP_PORT -showcerts </dev/null 2>/dev/null | openssl x509 -outform PEM | tee /etc/pki/ca-trust/source/anchors/$DOMAIN_NAME.crt
+update-ca-trust
+/bin/systemctl restart docker
+
+
+
+
+### IMPORTANTE ### 
+Nos clientes, importar certificado do servidor Docker Registry
+
+-------------
+export DOMAIN_NAME=nasrvranchhl01as.na.sebrae.corp
+export TCP_PORT=443
+openssl s_client -connect $DOMAIN_NAME:$TCP_PORT -showcerts </dev/null 2>/dev/null | openssl x509 -outform PEM | tee /etc/pki/ca-trust/source/anchors/$DOMAIN_NAME.crt
+update-ca-trust
+/bin/systemctl restart docker.service
+--------------
+
+
+
+
+
+#### Instalando Rancher 2 via RKE
+
+ useraddd -m rancher
+ groupadd docker
+ usermod -aG docker ranhcer
+
+ SSH - Atualizar
+ colocar:
+ 			AllowTcpForwarding yes
+			permittunnel yes
+Reiniciar serviço
+
+
+Binário no git ou internet
+
+/data/rke  --config /data/cluster4.yml
+
+
+#após instalar cluster
+
+install HEML
+
+kubectl -n kube-system create serviceaccount tiller
+kubectl create clusterrolebinding tiller --clusterrole cluster-admin --serviceaccount=kube-system:tiller
+helm init --service-account tiller
+
+helm repo add rancher-stable https://releases.rancher.com/server-charts/stable
+
+helm install stable/cert-manager --name cert-manager --namespace kube-system
+
+install rancher: helm install rancher-stable/rancher --name rancher  --namespace cattle-system  --set hostname=nasrvranchhl01as.na.sebrae.corp
+
+kubectl expose deployment rancher --namespace=cattle-system --type=NodePort --name=rancher2
+kubectl describe service rancher2
+
+
+
+### Instalar Kubernets
+
+cat <<EOF > /etc/yum.repos.d/kubernetes.repo
+[kubernetes]
+name=Kubernetes
+baseurl=https://packages.cloud.google.com/yum/repos/kubernetes-el7-x86_64
+enabled=1
+gpgcheck=1
+repo_gpgcheck=1
+gpgkey=https://packages.cloud.google.com/yum/doc/yum-key.gpg https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg
+EOF
+yum install -y kubectl
+
+Criar pasta ~/.kube/
+Copiar arquivo config gerado pela instalação do RKE
+
+###Criando o NameSpace
+
+Criar arquivo Json:
+
+ criar_namespaces.json
+{
+  "kind": "Namespace",
+  "apiVersion": "v1",
+  "metadata": {
+    "name": "prova",
+    "labels": {
+      "name": "prova"
+    }
+  }
+}
+
+Criando Namespace
+ kubectl create -f criar_namespaces.json
+
+
+Configurando Namespace para criação de Pods dentro dele:
+
+ kubectl config view (pegar as informações do cluster USER CLUSTER CONTEXTO PROVA)
+
+
+Vê contexto atual:
+
+kubectl config current-context
+
+kubectl config set-context prova --namespace=prova --cluster=local --user=kube-admin
+
+Mudando pro contexto criado: kubectl config use-context prova
+
+Rodando um POD dentro do contexto :  kubectl run snowflake --image=kubernetes/serve_hostname --replicas=2
+Vendo processo de Deploy:
+kubectl get deployment
+ kubectl get pods -l run=snowflake
+
+ kubectl run httpd --image=httpd --port=80
+ kubectl expose deployment httpd --type=NodePort --name=servico-httpd
+
+ kubectl run nginx --image=httpd --port=80
+
+
+kubectl expose deployment nginx --type=NodePort --name=servico-nginx2 --port=81
+kubectl describe service servico-nginx2
+
+
+
+
+###### Instalar GITLAB pelo RAncher 
+
+gitlab/gitlab-ce:11.2.4-ce.0
+Portas 80 22 443
+
+usuario inicial root
+
+Volumes
+Criar no node : /data/gitlab/etc/gitlab Mount
+                /data/gitlab/var/opt/gitlab
+                /data/gitlab/var/log/gitlab
+
+git clone http://gitlab-6cf8cfc77c-qxgdt/root/app-php.git
+git add *
+git commit -m "msg"
+git push -u origin master
+
+#### Jenkins
+liatrio/alpine-jenkins
+
+/var/jenkins_home PV
+jenkins
+8080
+
+git config --global user.email "admin@example.com"
+git config --global user.name "Administrator"
+
+http://gitlab-79586b55b4-nchxx/root/prova.git
+
+ssh root@10.1.140.187
+cd /usr/local/apache2/htdocs/prova/
+git pull origin
+
+
+pipeline {
+    agent {
+        docker { image 'node:7-alpine' }
+    }
+    stages {
+        stage('Test') {
+            steps {
+                sh 'node --version'
+            }
+        }
+    }
+}
